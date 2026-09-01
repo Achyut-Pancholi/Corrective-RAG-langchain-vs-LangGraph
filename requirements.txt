@@ -1,0 +1,12 @@
+langchain>=0.2.14
+langchain-community>=0.2.12
+langchain-core>=0.2.33
+langchain-groq>=0.1.9
+langchain-huggingface>=0.0.3
+sentence-transformers>=2.2.2
+torchvision>=0.16.0
+langgraph>=0.2.10
+chromadb>=0.5.5
+langchain-chroma>=0.1.2
+streamlit>=1.37.1
+python-dotenv>=1.0.1

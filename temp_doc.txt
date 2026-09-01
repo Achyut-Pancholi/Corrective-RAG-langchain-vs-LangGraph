@@ -1,0 +1,54 @@
+Adaptive RAG (CRAG): LangChain vs. LangGraph
+1. Problem Statement
+Standard RAG retrieves documents once and generates an answer immediately, with no way to detect or recover from poor retrieval — a common failure with real knowledge bases. This POC implements Corrective RAG (CRAG): after retrieval, an LLM grades whether the retrieved documents are actually sufficient. If not, the system rewrites the query and retrieves again before generating a final answer.
+The comparison is not “LangChain vs. LangGraph” as competing tools — it is plain RAG (a linear chain) vs. CRAG (a graph with a corrective loop). LangChain provides the shared components (loaders, retriever, vector store, prompts) in both flows. LangGraph is what makes the corrective loop possible: its StateGraph supports conditional edges that can route back to an earlier node, which a linear LCEL chain cannot express cleanly.
+2. Objective and Scope
+Build both flows over the same document set and the same underlying components, expose them via one UI with a toggle, and make the difference visible through an execution trace — not just a better 
+final answer
+.
+Small fixed document set; vector store + retriever (Chroma/FAISS via LangChain)
+Flow A: linear LangChain chain (retrieve → generate)
+Flow B: LangGraph CRAG graph (retrieve → grade → conditional branch → rewrite-and-retry or generate), with a capped retry count to guarantee termination
+Simple UI (Streamlit): flow toggle, question input, answer output, execution trace panel for Flow B
+3. Approach
+Both flows share the same retriever, vector store, and LLM configuration — the only variable is orchestration logic.
+Flow A — LangChain (baseline)
+Retrieve top-k docs → stuff into prompt → generate in one LLM call. No correction step; a bad retrieval produces a bad answer, by design — this is the limitation the POC exposes.
+Flow B — LangGraph (CRAG)
+Retrieve → grade node (LLM judges sufficiency) → conditional edge: sufficient → generate; insufficient → rewrite query and loop back to retrieval (capped at 2 attempts) → generate.
+4. Tech Stack
+Layer
+Choice
+Orchestration
+LangChain (LCEL) — baseline; LangGraph (StateGraph) — corrective
+Vector store / Embeddings
+Chroma or FAISS; LangChain-supported embedding model
+LLM / UI / Language
+LangChain-supported chat model; Streamlit; Python
+5. Timeline (10 Working Days)
+Day
+Focus
+Outcome
+1–3
+Foundations (LCEL, retrievers, vector stores) + build Flow A
+Working baseline RAG chain
+4–6
+LangGraph concepts (StateGraph, conditional edges) + build Flow B
+Working CRAG graph with corrective loop
+7
+Integrate — share retriever/vector store/LLM config across both flows
+Flows differ only in orchestration
+8
+Build UI: toggle, input/output, execution trace panel (Streamlit)
+End-to-end demoable app
+9
+Test on representative questions; refine grading/rewrite prompts
+Verified self-correction behavior
+10
+Buffer for fixes; write-up and walkthrough prep
+Ready for mentor review
+6. Deliverables
+Source code for both flows, sharing common retrieval/LLM components
+Working UI: flow selector, question input, answer output, execution trace (Flow B)
+Fixed test document set + a small question set showing (a) both flows performing similarly, and (b) Flow B visibly self-correcting where Flow A does not
+Short written/verbal walkthrough of the architecture and key design decisions for mentor review

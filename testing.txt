@@ -1,0 +1,56 @@
+ADAPTIVE RAG (CRAG) — TESTING INSTRUCTIONS & COMPARISON
+
+This guide provides test scenarios comparing Standard LangChain Baseline RAG vs. Self-Correcting LangGraph CRAG flow.
+
+---
+
+1. PREREQUISITES
+Ensure your `.env` contains your GROQ_API_KEY and Streamlit is running:
+streamlit run app.py
+
+---
+
+2. TEST SCENARIO A: Demonstrating CRAG Self-Correction & Trace Difference
+
+Question to Ask:
+"What company opposed the 2047 zero-emission engine law?"
+
+A) Select "LangChain — Baseline RAG"
+- RESULT: Output: "I'm sorry, but I don't have that information in the provided documents."
+- EXECUTION TRACE:
+  - Question received
+  - Documents retrieved (Retrieved 2 documents)
+  - Answer generated
+- WHY IT HAPPENS: Standard RAG does a single retrieval pass. Vector search fetches doc4.txt (which mentions 2047 & zero-emission engines) and doc1.txt. Baseline RAG blindly feeds these two documents into the LLM. The LLM realizes neither document mentions a company opposing a 2047 law, so it fails.
+
+B) Select "LangGraph — Corrective RAG"
+- RESULT: Shows self-correcting graph execution with warnings.
+- EXECUTION TRACE:
+  - ✅ Question received
+  - ✅ Documents retrieved (Retrieved 2 documents)
+  - ⚠️ Documents graded - Documents insufficient
+  - ⚠️ Query rewritten - New query: 2047 zero-emission engine law company opposition
+  - ✅ Documents retrieved again - Retrieved 2 documents
+  - ⚠️ Documents graded - Documents insufficient
+  - ✅ Answer generated
+- WHY THIS PROVES CRAG WORKS: 
+  Unlike Baseline RAG which blindly assumes Pass 1 retrieval is valid, CRAG's Document Grader inspects the retrieved context, detects that doc4.txt is insufficient to answer the question, flags a WARNING, and triggers a Query Rewrite to attempt recovery!
+
+---
+
+3. TEST SCENARIO B: Direct Knowledge Query (Demonstrating Parity)
+
+Question to Ask:
+"What is Project Nexus and what performance concerns were identified with the Nexus-1 prototype?"
+
+A) Select "LangChain — Baseline RAG"
+- RESULT: Correctly answers Dr. Sarah Lin (2047), zero-emission quantum propulsion, and 1,000-hour degradation concerns.
+
+B) Select "LangGraph — Corrective RAG"
+- RESULT: Identical response.
+- WHY IT HAPPENS: Initial retrieval fetches doc4.txt directly. The Document Grader evaluates it as SUFFICIENT on pass 1 and immediately routes to generation without unnecessary query rewrites.
+
+---
+
+4. CUSTOM TESTING
+You can add your own `.txt` files to `data/documents/`. Streamlit automatically indexes all files in `data/documents/` on your next query.
