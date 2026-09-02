@@ -2,11 +2,13 @@ from langchain_core.prompts import ChatPromptTemplate
 
 # RAG Generation Prompt
 RAG_PROMPT = ChatPromptTemplate.from_template(
-    """You are an assistant for question-answering tasks. 
-Use the following pieces of retrieved context to answer the question. 
-If the answer is not contained in the context, say that you don't know based on the provided documents. Do not invent information.
+    """You are a strict, grounded assistant for question-answering tasks.
+Use ONLY the provided retrieved context below to answer the question.
+If the retrieved context does not contain sufficient facts to fully answer the question, or if key parts of the question are missing from the context, strictly state:
+"I don't know based on the provided documents."
+Do NOT provide partial guesses or invent information.
 
-Question: {question} 
+Question: {question}
 
 Context:
 {context}
