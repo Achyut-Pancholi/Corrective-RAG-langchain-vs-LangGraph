@@ -19,7 +19,44 @@ if not os.getenv("GROQ_API_KEY"):
     st.error("Missing GROQ_API_KEY in environment variables. Please check your .env file or add it here.")
     st.stop()
 
-st.divider()
+# with st.sidebar:
+#     st.header("Architecture Visualizer")
+#     st.subheader("LangChain Baseline")
+#     st.components.v1.html(
+#         """
+#         <script type="module">
+#           import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+#           mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+#         </script>
+#         <div class="mermaid">
+#         graph LR;
+#             A([Start]) --> B[1. Retrieve] --> C[2. Generate] --> D([End]);
+#         </div>
+#         """,
+#         height=140,
+#     )
+
+#     st.divider()
+#     st.subheader("LangGraph CRAG Loop")
+#     st.components.v1.html(
+#         """
+#         <script type="module">
+#           import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+#           mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+#         </script>
+#         <div class="mermaid">
+#         graph TD;
+#             Start([Start]) --> Retrieve[1. Retrieve Docs];
+#             Retrieve --> Grade{2. Grade Relevance};
+#             Grade -- Relevant --> Generate[4. Generate Answer];
+#             Grade -- Insufficient --> Rewrite[3. Rewrite Query];
+#             Rewrite --> Retrieve;
+#             Generate --> End([End]);
+#         </div>
+#         """,
+#         height=320,
+#     )
+#     st.divider()
 
 flow_choice = st.radio(
     "Select Flow",

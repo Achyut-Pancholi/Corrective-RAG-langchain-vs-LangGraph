@@ -1,0 +1,1 @@
+Standard interstellar vessel maintenance guidelines require inspecting general propulsion components every 500 flight hours. Standard spacecraft engines run on deuterium fuel cells rather than experimental minerals. Routine diagnostics check for thermal stress and radiation shielding integrity.

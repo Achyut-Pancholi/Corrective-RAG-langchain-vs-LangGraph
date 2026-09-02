@@ -1,56 +1,108 @@
-ADAPTIVE RAG (CRAG) — TESTING INSTRUCTIONS & COMPARISON
+================================================================================
+          ADAPTIVE RAG (CRAG) — TESTING GUIDE & BENCHMARK SCENARIOS
+================================================================================
 
-This guide provides test scenarios comparing Standard LangChain Baseline RAG vs. Self-Correcting LangGraph CRAG flow.
+This guide provides test scenarios to demonstrate the architectural differences 
+between Standard Linear RAG (LangChain) and Self-Correcting Graph RAG (LangGraph CRAG).
 
----
+Dataset Ingested: 1,245 chunks across 12 Research Papers (PDF) + Custom Domain Docs (TXT).
 
-1. PREREQUISITES
-Ensure your `.env` contains your GROQ_API_KEY and Streamlit is running:
-streamlit run app.py
+================================================================================
+1. PREREQUISITES & RUNNING THE APP
+================================================================================
+1. Activate virtual environment:
+   .\venv\Scripts\Activate.ps1
 
----
+2. Launch Streamlit UI:
+   streamlit run app.py
 
-2. TEST SCENARIO A: Demonstrating CRAG Self-Correction & Trace Difference
+Open http://localhost:8501 in your browser.
 
-Question to Ask:
-"What company opposed the 2047 zero-emission engine law?"
+================================================================================
+2. TEST SCENARIO 1: The Winning CRAG Showcase (LangChain Fails -> LangGraph Recovers)
+================================================================================
+
+Target Query:
+"How do researchers map different Earth terrain types and what spatial resolution bands were utilized from the European satellite?"
 
 A) Select "LangChain — Baseline RAG"
-- RESULT: Output: "I'm sorry, but I don't have that information in the provided documents."
+-------------------------------------
+- RESULT: Refusal / Failure
+  "I'm sorry, but the provided documents do not contain information about the spatial 
+   resolution bands used from a European satellite, nor do they describe the specific 
+   methods researchers use to map different Earth terrain types."
 - EXECUTION TRACE:
   - Question received
   - Documents retrieved (Retrieved 2 documents)
   - Answer generated
-- WHY IT HAPPENS: Standard RAG does a single retrieval pass. Vector search fetches doc4.txt (which mentions 2047 & zero-emission engines) and doc1.txt. Baseline RAG blindly feeds these two documents into the LLM. The LLM realizes neither document mentions a company opposing a 2047 law, so it fails.
+- WHY IT FAILS: Baseline RAG performs a single-shot retrieval pass. Vector search returns 
+  tangential background chunks from ATLAS altimeter systems that do not contain the actual 
+  satellite mapping bands. Baseline RAG blindly feeds these into the LLM, resulting in a refusal.
 
 B) Select "LangGraph — Corrective RAG"
-- RESULT: Shows self-correcting graph execution with warnings.
+--------------------------------------
+- RESULT: Accurate, Complete Answer
+  "Researchers map different Earth terrain types using spectral data collected by the MERIS 
+   and MODIS sensors aboard the European satellite ENVISAT.
+   - MERIS provides daily images in a set of spectral bands.
+   - MODIS supplies 36 spectral bands covering all land surfaces with spatial resolutions 
+     ranging from 250 m to 1 km..."
 - EXECUTION TRACE:
   - ✅ Question received
   - ✅ Documents retrieved (Retrieved 2 documents)
-  - ⚠️ Documents graded - Documents insufficient
-  - ⚠️ Query rewritten - New query: 2047 zero-emission engine law company opposition
-  - ✅ Documents retrieved again - Retrieved 2 documents
-  - ⚠️ Documents graded - Documents insufficient
+  - ⚠️ Documents graded (Documents insufficient)
+  - ⚠️ Query rewritten (New query: terrain classification mapping European satellite spatial resolution bands)
+  - ✅ Documents retrieved again (Retrieved 2 documents)
+  - ⚠️ Documents graded (Documents insufficient)
+  - ⚠️ Query rewritten (New query: European satellite terrain classification spatial resolution bands)
+  - ✅ Documents retrieved again (Retrieved 2 documents)
+  - ✅ Documents graded (Sufficient context found!)
   - ✅ Answer generated
 - WHY THIS PROVES CRAG WORKS: 
-  Unlike Baseline RAG which blindly assumes Pass 1 retrieval is valid, CRAG's Document Grader inspects the retrieved context, detects that doc4.txt is insufficient to answer the question, flags a WARNING, and triggers a Query Rewrite to attempt recovery!
+  CRAG's Document Grader inspects retrieved documents, identifies that the initial retrieval 
+  lacked factual data, rejects the noise, and executes an automated query rewrite loop to 
+  retrieve the exact technical section from the ENVISAT satellite study.
 
----
+================================================================================
+3. TEST SCENARIO 2: Direct Technical Accuracy (Demonstrating Fast Parity)
+================================================================================
 
-3. TEST SCENARIO B: Direct Knowledge Query (Demonstrating Parity)
-
-Question to Ask:
-"What is Project Nexus and what performance concerns were identified with the Nexus-1 prototype?"
+Target Query:
+"What specific accuracy score was achieved by the novel convolutional neural network model when diagnosing lung cancer on CT scan images?"
 
 A) Select "LangChain — Baseline RAG"
-- RESULT: Correctly answers Dr. Sarah Lin (2047), zero-emission quantum propulsion, and 1,000-hour degradation concerns.
+-------------------------------------
+- RESULT: "The novel convolutional neural network model achieved a 100% testing accuracy when diagnosing lung cancer on CT scan images."
 
 B) Select "LangGraph — Corrective RAG"
-- RESULT: Identical response.
-- WHY IT HAPPENS: Initial retrieval fetches doc4.txt directly. The Document Grader evaluates it as SUFFICIENT on pass 1 and immediately routes to generation without unnecessary query rewrites.
+--------------------------------------
+- RESULT: "The novel convolutional neural network model achieved a 100% testing accuracy when diagnosing lung cancer on CT scan images."
+- EXECUTION TRACE:
+  - ✅ Question received
+  - ✅ Documents retrieved (Retrieved 2 documents)
+  - ✅ Documents graded (Sufficient context found)
+  - ✅ Answer generated
+- WHY IT HAPPENS: When initial vector retrieval successfully retrieves the ground-truth document 
+  on the first pass, CRAG grades it as sufficient and routes directly to generation without 
+  unnecessary query rewrites or latency.
 
----
+================================================================================
+4. TEST SCENARIO 3: Negative / Out-of-Domain Query (Hallucination Prevention)
+================================================================================
 
-4. CUSTOM TESTING
-You can add your own `.txt` files to `data/documents/`. Streamlit automatically indexes all files in `data/documents/` on your next query.
+Target Query:
+"What was the battery efficiency of the electric vehicle powertrain tested in the 2025 automotive study?"
+
+A) Both Flows:
+--------------
+- RESULT: "I don't know based on the provided documents."
+- WHY IT HAPPENS: Both flows strictly adhere to prompt constraints and avoid hallucinating facts 
+  when information is absent from the knowledge base.
+
+================================================================================
+5. DATASET & ARCHITECTURE NOTES
+================================================================================
+- Document Ingestion: src/ingestion/loader.py (Supports PDF and TXT with RecursiveCharacterTextSplitter)
+- Vector Store: src/retrieval/vector_store.py (Cached Chroma DB on disk at data/chroma_db)
+- Embeddings: HuggingFace all-MiniLM-L6-v2 (Local, zero API cost)
+- LLM: Groq openai/gpt-oss-20b (Ultra-low latency inference)

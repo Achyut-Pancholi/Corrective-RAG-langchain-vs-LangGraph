@@ -1,68 +1,170 @@
 # Adaptive RAG (CRAG) POC
 
 ## Project Overview
-This project is a Proof of Concept (POC) demonstrating **Corrective Retrieval-Augmented Generation (CRAG)**. It compares a standard linear RAG pipeline (using LangChain) against an adaptive, self-correcting RAG pipeline (using LangGraph).
+This project is an enterprise-grade Proof of Concept (POC) demonstrating **Corrective Retrieval-Augmented Generation (CRAG)**. It provides a side-by-side comparison between a standard linear RAG pipeline (built with **LangChain**) and an adaptive, self-correcting graph-based RAG pipeline (built with **LangGraph**).
 
-## Problem
-Standard RAG retrieves documents based on a user query and immediately generates an answer. If the retrieved documents are irrelevant or poor in quality, the system lacks a mechanism to correct itself, often leading to hallucinations or "I don't know" responses.
+---
 
-CRAG solves this by introducing a grading step. An LLM evaluates the retrieved documents for relevance. If they are deemed insufficient, the system dynamically rewrites the query and retrieves new documents before generating the final answer.
+## The Problem
+Standard linear RAG operates on a single-shot `Retrieve → Generate` paradigm:
+1. When a user submits a query that uses colloquial phrasing, synonyms, or conceptual terms, vector search often retrieves tangential or distracting chunks.
+2. Standard RAG blindly passes these poor chunks to the LLM, leading to hallucinations or unhelpful *"I don't know"* refusals.
+3. It has no feedback mechanism to evaluate retrieval quality or self-correct.
 
-## Architecture
-- **LangChain Flow (Baseline):** `Question → Retrieve → Generate`
-- **LangGraph Flow (CRAG):** `Question → Retrieve → Grade → Conditional Routing (Rewrite → Retrieve if needed) → Generate`
+### The Solution: Corrective RAG (CRAG)
+CRAG introduces an **active evaluation circuit**:
+- **Document Grading Node**: An LLM acts as an evaluator, grading whether retrieved documents contain factual context relevant to the user query.
+- **Dynamic Query Rewriting**: If retrieved context is insufficient or noisy, the system reformulates the query into formal technical terminology.
+- **Stateful Retries**: LangGraph executes a cyclical feedback loop (up to `MAX_RETRIES`) to re-retrieve documents before generating the grounded answer.
 
-Shared components include the LLM (Groq API), Embeddings (HuggingFace local), Vector Store (Chroma), and Prompts.
+---
 
-## Project Structure
-- `data/documents/`: Small set of synthetic documents used for the knowledge base.
-- `src/config.py`: Environment and constant configuration.
-- `src/llm/factory.py`: LLM and Embedding initialization.
-- `src/ingestion/loader.py`: Document loading and text splitting.
-- `src/retrieval/`: Vector store and retriever setup.
-- `src/prompts/`: System prompts for generation, grading, and rewriting.
-- `src/models/state.py`: TypedDict for LangGraph state management.
-- `src/flows/`: The core LangChain and LangGraph implementations.
-- `app.py`: Streamlit User Interface.
+## Flow Comparison & Architecture
 
-## Setup
-1. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   ```
-2. Activate the environment:
-   - Windows: `.venv\Scripts\activate`
-   - Mac/Linux: `source .venv/bin/activate`
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Copy `.env.example` to `.env` and fill in your Groq API key:
-   ```env
-   GROQ_API_KEY=your_key_here
-   ```
+### 1. LangChain Flow (Baseline Single-Shot RAG)
+```
+[User Question] ───► [Vector Store (k=2)] ───► [Prompt + LLM] ───► [Final Output]
+```
 
-## Run
-Start the Streamlit application:
+### 2. LangGraph Flow (Self-Correcting CRAG)
+```
+                                 ┌──────────────────────────┐
+                                 │     [User Question]      │
+                                 └─────────────┬────────────┘
+                                               │
+                                       ┌───────▼──────┐
+                                       │   Retrieve   │◄─────────────────┐
+                                       └───────┬──────┘                  │
+                                               │                         │
+                                    ┌──────────▼──────────┐              │
+                                    │   Grade Documents   │              │
+                                    └──────────┬──────────┘              │
+                                               │                         │
+                                    [Sufficient Context?]                │
+                                     /                 \                 │
+                              YES   /                   \   NO           │
+                                   /                     \               │
+                        ┌─────────▼────────┐      ┌───────▼────────┐     │
+                        │     Generate     │      │ Rewrite Query  ├─────┘
+                        │   Final Answer   │      │ (if < retries) │
+                        └─────────┬────────┘      └────────────────┘
+                                  │
+                               [End]
+```
+
+---
+
+## Directory & Folder Structure
+
+```
+crag/
+│
+├── data/
+│   ├── documents/                     # Raw knowledge base files (PDFs + TXTs)
+│   │   ├── *.pdf                      # 12 Research Papers (AI, Medical, Remote Sensing)
+│   │   └── doc1.txt - doc8.txt        # Structured scenario & distractor documents
+│   └── chroma_db/                     # Persistent local Chroma vector database cache
+│
+├── docs/
+│   └── architecture_and_decisions.md  # Architectural decision records (ADRs)
+│
+├── src/
+│   ├── config.py                      # Global paths, environment variables & hyperparameters
+│   │
+│   ├── ingestion/
+│   │   └── loader.py                  # Document loaders (DirectoryLoader, PyPDFLoader) & TextSplitters
+│   │
+│   ├── llm/
+│   │   └── factory.py                 # LLM (Groq API) & HuggingFace Embedding factory
+│   │
+│   ├── retrieval/
+│   │   ├── vector_store.py            # Chroma vector store persistence & indexing
+│   │   └── retriever.py               # Configured retriever interface
+│   │
+│   ├── prompts/
+│   │   └── templates.py               # Domain-agnostic templates (RAG, Grading, Rewrite)
+│   │
+│   ├── models/
+│   │   └── state.py                   # TypedDict schema for LangGraph state & execution traces
+│   │
+│   ├── flows/
+│   │   ├── langchain_rag.py           # Linear Baseline RAG implementation
+│   │   └── langgraph_crag.py          # Cyclical CRAG StateGraph implementation
+│   │
+│   └── utils/
+│       └── formatting.py              # Context formatting & TraceStep dataclasses
+│
+├── app.py                             # Streamlit UI dashboard with interactive execution tracing
+├── requirements.txt                   # Project dependencies
+├── testing.txt                        # Benchmark test scenarios & evaluation queries
+├── .env.example                       # Environment variables template
+├── .env                               # Local secrets (API keys)
+└── README.md                          # Main project documentation
+```
+
+---
+
+## Setup & Installation
+
+### 1. Prerequisites
+- Python 3.10+
+- Free Groq API Key ([https://console.groq.com](https://console.groq.com))
+
+### 2. Environment Setup
+```bash
+# Clone the repository
+git clone https://github.com/your-username/crag.git
+cd crag
+
+# Create and activate a virtual environment
+# On Windows:
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# On Linux/macOS:
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Configure Environment Variables
+Copy `.env.example` to `.env` and provide your Groq API key:
+```env
+GROQ_API_KEY=gsk_your_groq_api_key_here
+LLM_MODEL=openai/gpt-oss-20b
+TOP_K=2
+MAX_RETRIES=2
+```
+
+---
+
+## Running the Application
+
+Launch the Streamlit interactive dashboard:
 ```bash
 streamlit run app.py
 ```
+Open **`http://localhost:8501`** in your browser.
 
-## Example Questions to Try
-Our knowledge base contains synthetic data about the "lost city of Aethelgard" and "Lumicite crystals".
+---
 
-1. **Normal Retrieval (Both succeed):**
-   * "Who discovered the lost city of Aethelgard and when?"
-2. **Corrective Retrieval (LangGraph corrects):**
-   * "What did Marcus Thorne think about the new treaty regarding the blue crystals?" (Uses vague terms, triggering poor initial retrieval, prompting a rewrite).
-3. **Unsupported Information (System declines):**
-   * "What is the population of Aethelgard?"
+## Key Benchmark Scenarios
 
-## Limitations
-- This POC uses a very small, fixed document set for demonstration purposes.
-- Evaluation (grading) is qualitative, handled by the LLM.
+| Scenario | Sample Query | LangChain (Baseline) | LangGraph (CRAG) |
+| :--- | :--- | :--- | :--- |
+| **1. Self-Correction Showcase** | *"How do researchers map different Earth terrain types and what spatial resolution bands were utilized from the European satellite?"* | ❌ **Refusal:** Retrieves tangential ATLAS chunks $\rightarrow$ *"I don't know"* | ✅ **Recovers:** Grades docs as insufficient $\rightarrow$ Rewrites query $\rightarrow$ Retrieves ENVISAT MERIS/MODIS bands $\rightarrow$ Answers accurately |
+| **2. Fast Technical Parity** | *"What specific accuracy score was achieved by the novel convolutional neural network model when diagnosing lung cancer on CT scan images?"* | ✅ **Direct Answer:** 100% testing accuracy | ✅ **Direct Answer:** 100% accuracy (Skips rewrites on valid pass 1) |
+| **3. Negative / Out-of-Domain** | *"What was the battery efficiency of the electric vehicle powertrain tested in the 2025 automotive study?"* | 🛡️ **Declines:** Avoids hallucinations | 🛡️ **Declines:** Avoids hallucinations |
 
-## Future Improvements
-- Automated quantitative evaluation (RAGAS).
-- Integration with a production vector database (e.g., Pinecone, Qdrant).
-- Hybrid search (Keyword + Semantic).
+---
+
+## Tech Stack & Components
+
+- **Orchestration**: LangGraph, LangChain
+- **LLM Provider**: Groq Cloud (`openai/gpt-oss-20b`)
+- **Embeddings**: HuggingFace `sentence-transformers/all-MiniLM-L6-v2` (Local, zero cost)
+- **Vector Database**: ChromaDB (with persistent disk storage)
+- **Frontend UI**: Streamlit
+- **Document Processing**: PyPDF, LangChain Community Loaders & Splitters
