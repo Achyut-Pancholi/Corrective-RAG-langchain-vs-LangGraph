@@ -16,8 +16,10 @@ Answer:"""
 
 # Document Grading Prompt
 GRADING_PROMPT = ChatPromptTemplate.from_template(
-    """You are a grader assessing whether a retrieved document contains relevant information to answer a user's question.
-If the document contains facts or information that help answer the question, grade it as 'yes'. Otherwise, grade it as 'no'.
+    """You are a strict relevance grader assessing whether a retrieved document contains specific facts or context to answer the user's question.
+If the document contains factual information, data, or direct evidence that helps answer the question, grade it as 'yes'.
+If the document only mentions tangential keywords without providing substantive facts to answer the question, grade it as 'no'.
+
 Provide the output as exactly 'yes' or 'no' with no other text.
 
 Question: {question}
@@ -25,12 +27,15 @@ Document: {document}
 Relevant (yes/no):"""
 )
 
-# Query Rewriting Prompt
+# Query Rewriting Prompt (Domain-Agnostic / Industry Standard)
 REWRITE_PROMPT = ChatPromptTemplate.from_template(
-    """You are a question re-writer for a vector database containing documents about Lumicite, Zephyr Corporation, and Project Nexus.
-Convert the user's question into a plain-text search query using terms like 'Zephyr Corporation consumer medical devices' or 'Lumicite Treaty'.
-Do NOT use markdown, code blocks, or boolean logic like AND/OR. Output ONLY plain text.
+    """You are an expert search query rewriter for an advanced information retrieval system.
+A user asked a question, but initial retrieval returned irrelevant documents.
+Analyze the user's question to identify the core technical concepts, decompose vague phrasing, and formulate a targeted,
+high-relevance search query.
+Focus on probable technical terminology, alternative keywords, and underlying mechanisms.
 
 Initial question: {question}
-Search Query:"""
+
+Provide only the reformulated plain-text search query. Do NOT use markdown, quotes, explanations, or boolean logic:"""
 )

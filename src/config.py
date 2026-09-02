@@ -7,6 +7,7 @@ load_dotenv()
 # Directories
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DOCUMENTS_DIR = PROJECT_ROOT / "data" / "documents"
+CHROMA_PERSIST_DIR = PROJECT_ROOT / "data" / "chroma_db"
 
 # LLM Config
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
