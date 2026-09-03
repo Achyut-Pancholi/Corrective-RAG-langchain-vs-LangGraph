@@ -22,35 +22,20 @@ CRAG introduces an **active evaluation circuit**:
 ## Flow Comparison & Architecture
 
 ### 1. LangChain Flow (Baseline Single-Shot RAG)
-```
-[User Question] ───► [Vector Store (k=2)] ───► [Prompt + LLM] ───► [Final Output]
-```
+
+Visualized directly from `chain.get_graph().draw_mermaid_png()`:
+
+<p align="center">
+  <img src="docs/langchain_graph.png" alt="LangChain Flow Graph" width="280" />
+</p>
 
 ### 2. LangGraph Flow (Self-Correcting CRAG)
-```
-                                 ┌──────────────────────────┐
-                                 │     [User Question]      │
-                                 └─────────────┬────────────┘
-                                               │
-                                       ┌───────▼──────┐
-                                       │   Retrieve   │◄─────────────────┐
-                                       └───────┬──────┘                  │
-                                               │                         │
-                                    ┌──────────▼──────────┐              │
-                                    │   Grade Documents   │              │
-                                    └──────────┬──────────┘              │
-                                               │                         │
-                                    [Sufficient Context?]                │
-                                     /                 \                 │
-                              YES   /                   \   NO           │
-                                   /                     \               │
-                        ┌─────────▼────────┐      ┌───────▼────────┐     │
-                        │     Generate     │      │ Rewrite Query  ├─────┘
-                        │   Final Answer   │      │ (if < retries) │
-                        └─────────┬────────┘      └────────────────┘
-                                  │
-                               [End]
-```
+
+Visualized directly from compiled `workflow.get_graph().draw_mermaid_png()`:
+
+<p align="center">
+  <img src="docs/langgraph_graph.png" alt="LangGraph CRAG Flow Graph" width="300" />
+</p>
 
 ---
 
