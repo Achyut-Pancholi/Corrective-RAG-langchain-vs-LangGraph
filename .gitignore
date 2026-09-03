@@ -24,3 +24,7 @@ Thumbs.db
 
 # Vector Database Cache
 data/chroma_db/
+
+# Documentation & Guides
+docs/
+Mentor_Deep_Dive_Guide.txt
