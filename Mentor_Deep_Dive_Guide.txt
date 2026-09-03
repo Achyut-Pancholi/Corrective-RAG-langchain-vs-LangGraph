@@ -1264,118 +1264,93 @@ INSTRUCTION-BY-INSTRUCTION BREAKDOWN:
 SECTION 3.10: src/flows/langchain_rag.py — THE BASELINE FLOW
 ================================================================================
 
-FULL FILE CONTENT (all 40 lines):
+FULL FILE CONTENT:
 
-  1:  from langchain_core.runnables import RunnablePassthrough
-  2:  from langchain_core.output_parsers import StrOutputParser
-  3:  from src.retrieval.retriever import get_retriever
-  4:  from src.prompts.templates import RAG_PROMPT
-  5:  from src.llm.factory import get_llm
-  6:  from src.utils.formatting import format_docs, TraceStep
-  7:  from src.models.state import GraphState
-  8:
-  9:  def run_langchain_flow(question: str) -> GraphState:
-  10:     """Runs the linear baseline RAG flow using LangChain."""
-  11:     
-  12:     trace = [TraceStep(name="Question received", status="success")]
-  13:     
-  14:     retriever = get_retriever()
-  15:     llm = get_llm()
-  16:     
-  17:     # 1. Retrieve
-  18:     docs = retriever.invoke(question)
-  19:     trace.append(TraceStep(name="Documents retrieved", status="success", 
-  20:                            details=f"Retrieved {len(docs)} documents"))
-  21:     
-  22:     # 2. Generate
-  23:     chain = (
-  24:         {"context": lambda x: format_docs(docs), "question": RunnablePassthrough()}
-  25:         | RAG_PROMPT
-  26:         | llm
-  27:         | StrOutputParser()
-  28:     )
-  29:     
-  30:     generation = chain.invoke(question)
-  31:     trace.append(TraceStep(name="Answer generated", status="success"))
-  32:     
-  33:     return {
-  34:         "question": question,
-  35:         "documents": docs,
-  36:         "generation": generation,
-  37:         "retry_count": 0,
-  38:         "rewritten_query": "",
-  39:         "execution_trace": trace
-  40:     }
+  1:  from langchain_core.output_parsers import StrOutputParser
+  2:  from src.retrieval.retriever import get_retriever
+  3:  from src.prompts.templates import RAG_PROMPT
+  4:  from src.llm.factory import get_llm
+  5:  from src.utils.formatting import format_docs, TraceStep
+  6:  from src.models.state import GraphState
+  7:
+  8:  def run_langchain_flow(question: str) -> GraphState:
+  9:      """Runs the linear baseline RAG flow using LangChain."""
+  10:     
+  11:     trace = [TraceStep(name="Question received", status="success")]
+  12:     
+  13:     retriever = get_retriever()
+  14:     llm = get_llm()
+  15:     
+  16:     # 1. Retrieve
+  17:     docs = retriever.invoke(question)
+  18:     trace.append(TraceStep(name="Documents retrieved", status="success", 
+  19:                            details=f"Retrieved {len(docs)} documents"))
+  20:     
+  21:     # 2. Generate (Sequential LCEL chain)
+  22:     chain = RAG_PROMPT | llm | StrOutputParser()
+  23:     generation = chain.invoke({
+  24:         "context": format_docs(docs),
+  25:         "question": question
+  26:     })
+  27:     trace.append(TraceStep(name="Answer generated", status="success"))
+  28:     
+  29:     return {
+  30:         "question": question,
+  31:         "documents": docs,
+  32:         "generation": generation,
+  33:         "retry_count": 0,
+  34:         "rewritten_query": "",
+  35:         "execution_trace": trace
+  36:     }
 
 THIS IS THE "CONTROL GROUP" — IT SHOWS WHAT GOES WRONG WITHOUT CRAG.
 
-Line 9: def run_langchain_flow(question: str) -> GraphState:
+Line 8: def run_langchain_flow(question: str) -> GraphState:
   Function signature.
   question: str — takes the user's question as input.
   -> GraphState — type hint declaring it returns a GraphState dict.
   (Python doesn't enforce type hints at runtime, but they serve as documentation.)
 
-Line 12: trace = [TraceStep(...)]
+Line 11: trace = [TraceStep(...)]
   Initializes the execution trace list with the first step.
   Note it's a LIST created with the first step already in it (not empty).
 
-Line 14-15: Get retriever and LLM instances.
+Line 13-14: Get retriever and LLM instances.
   These call the factory functions which use the singleton/cache patterns 
   described earlier.
 
-Line 18: docs = retriever.invoke(question)
+Line 17: docs = retriever.invoke(question)
   THE KEY FLAW OF STANDARD RAG IS HERE.
   The ORIGINAL, UNMODIFIED user question is used directly for retrieval.
   If the question is vague ("satellite stuff"), the retrieved documents 
   may not be relevant. But we don't check — we just use them.
 
-Lines 23-28: Building the LCEL chain (LangChain Expression Language)
-  chain = (
-      {"context": lambda x: format_docs(docs), "question": RunnablePassthrough()}
-      | RAG_PROMPT
-      | llm
-      | StrOutputParser()
-  )
-
-  STEP 1: The dictionary at the start
-    {"context": lambda x: format_docs(docs), "question": RunnablePassthrough()}
-    
-    This is a LangChain RunnableParallel — it's a runnable that produces 
-    multiple values simultaneously.
-    
-    "context": lambda x: format_docs(docs)
-      lambda x: is an anonymous function. "x" is the input (question string) 
-      but it's IGNORED here. The function just calls format_docs(docs) which 
-      was already retrieved above (captured in the lambda's closure scope).
-      RESULT: context = "chunk1 text\n\nchunk2 text"
-    
-    "question": RunnablePassthrough()
-      RunnablePassthrough is the identity function — it passes its input 
-      through unchanged.
-      RESULT: question = the original question string
-    
-    COMBINED RESULT: A dict like:
-      {"context": "chunk1 text\n\nchunk2 text", "question": "user's question"}
-
-  STEP 2: RAG_PROMPT
-    The dict above fills the {context} and {question} placeholders in the prompt.
+Lines 22-26: The Sequential LCEL Chain
+  chain = RAG_PROMPT | llm | StrOutputParser()
+  generation = chain.invoke({
+      "context": format_docs(docs),
+      "question": question
+  })
+  
+  UNPACKING THE SEQUENTIAL LCEL CHAIN:
+  
+  STEP 1: RAG_PROMPT
+    We pass a dictionary directly: {"context": format_docs(docs), "question": question}
+    This directly fills {context} and {question} placeholders without needing
+    any parallel branching or RunnablePassthrough wrappers.
     RESULT: A fully formatted prompt string ready to send to the LLM.
 
-  STEP 3: llm
-    The formatted prompt is sent to ChatGroq (Groq API).
+  STEP 2: llm
+    The formatted prompt is piped (|) directly to ChatGroq (Groq API).
     RESULT: An AIMessage object containing the LLM's response text.
 
-  STEP 4: StrOutputParser()
+  STEP 3: StrOutputParser()
     Extracts just the text string from the AIMessage.
     AIMessage has attributes like .content (the text) and .response_metadata.
     StrOutputParser pulls out just the .content string.
     RESULT: A plain Python string containing the answer.
 
-Line 30: generation = chain.invoke(question)
-  "question" is the INPUT to the chain. The chain's first step (the dict) 
-  receives this and processes it as described above.
-
-Lines 33-40: Return value
+Lines 29-36: Return value
   Returns a complete GraphState dict so app.py can display the results 
   using the same code for both flows:
     - retry_count: 0 (standard RAG never retries)

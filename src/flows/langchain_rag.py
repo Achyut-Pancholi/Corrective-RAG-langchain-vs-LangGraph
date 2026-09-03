@@ -1,4 +1,3 @@
-from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from src.retrieval.retriever import get_retriever
 from src.prompts.templates import RAG_PROMPT
@@ -18,15 +17,12 @@ def run_langchain_flow(question: str) -> GraphState:
     docs = retriever.invoke(question)
     trace.append(TraceStep(name="Documents retrieved", status="success", details=f"Retrieved {len(docs)} documents"))
     
-    # 2. Generate
-    chain = (
-        {"context": lambda x: format_docs(docs), "question": RunnablePassthrough()}
-        | RAG_PROMPT
-        | llm
-        | StrOutputParser()
-    )
-    
-    generation = chain.invoke(question)
+    # 2. Generate (Sequential LCEL chain)
+    chain = RAG_PROMPT | llm | StrOutputParser()
+    generation = chain.invoke({
+        "context": format_docs(docs),
+        "question": question
+    })
     trace.append(TraceStep(name="Answer generated", status="success"))
     
     return {
