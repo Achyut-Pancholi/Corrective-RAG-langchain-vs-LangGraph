@@ -26,7 +26,7 @@ CRAG introduces an **active evaluation circuit**:
 Visualized directly from `chain.get_graph().draw_mermaid_png()`:
 
 <p align="center">
-  <img src="docs/langchain_graph.png" alt="LangChain Flow Graph" width="280" />
+  <img src="assets/langchain_graph.png" alt="LangChain Flow Graph" width="280" />
 </p>
 
 ### 2. LangGraph Flow (Self-Correcting CRAG)
@@ -34,7 +34,7 @@ Visualized directly from `chain.get_graph().draw_mermaid_png()`:
 Visualized directly from compiled `workflow.get_graph().draw_mermaid_png()`:
 
 <p align="center">
-  <img src="docs/langgraph_graph.png" alt="LangGraph CRAG Flow Graph" width="300" />
+  <img src="assets/langgraph_graph.png" alt="LangGraph CRAG Flow Graph" width="300" />
 </p>
 
 ---
@@ -44,14 +44,15 @@ Visualized directly from compiled `workflow.get_graph().draw_mermaid_png()`:
 ```
 crag/
 │
+├── assets/
+│   ├── langchain_graph.png            # Flow diagram for LangChain baseline
+│   └── langgraph_graph.png            # Flow diagram for LangGraph CRAG loop
+│
 ├── data/
 │   ├── documents/                     # Raw knowledge base files (PDFs + TXTs)
 │   │   ├── *.pdf                      # 12 Research Papers (AI, Medical, Remote Sensing)
 │   │   └── doc1.txt - doc8.txt        # Structured scenario & distractor documents
 │   └── chroma_db/                     # Persistent local Chroma vector database cache
-│
-├── docs/
-│   └── architecture_and_decisions.md  # Architectural decision records (ADRs)
 │
 ├── src/
 │   ├── config.py                      # Global paths, environment variables & hyperparameters
